@@ -72,7 +72,7 @@ function Invoke-Entry {
 	param (
 		[string]$command,
 		[Parameter(ValueFromRemainingArguments = $true)]
-		$args
+		[string[]]$args
 	)
 	Write-Debug "[entry]: command: $command"
 	Write-Debug "[entry]: args: $args"
@@ -98,7 +98,8 @@ function Invoke-Entry {
 	# Safety: conanical must be exist
 	$handle = "$PSScriptRoot/exec/$normal.ps1"
 	Write-Debug "$handle $($args -join ' ')"
-	flatten_exec $handle @args
+	& $handle @args
+	# flatten_exec $handle @args
 }
 
 Invoke-Entry @args

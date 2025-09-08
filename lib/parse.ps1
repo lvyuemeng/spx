@@ -51,26 +51,3 @@ function opts {
     
 	$pkgs, $flags_in
 }
-
-# avoid object[] fuzzy problem in @args splatting
-# flatten args and invoke expression to execute
-function flatten_exec {
-	param(
-		[string]$command,
-		[Parameter(ValueFromRemainingArguments = $true)]
-		$args
-	)
-			
-	$format = foreach ($arg in $args) {
-		if (-Not $arg) {
-			""
-		}
-		elseif ($arg -is [array] -or ($arg -is [System.Collections.IEnumerable] -and $arg -isnot [string])) {
-			$arg -join ", "
-		}
-		else {
-			$arg.ToString()
-		}
-	}
-	Invoke-Expression "$command $format"
-}

@@ -9,7 +9,7 @@ param(
 
 Write-Debug "[sync]: args: $args, count: $($args.Count)"
 
-$pkgs, $opts = opts "--global", "-g", $args
+$pkgs, $opts = opts "--global", "-g" $args
 $global = $opts["--global"] -or $opts["-g"]
 Write-Debug "[sync]: pkgs: $pkgs"
 Write-Debug "[sync]: global: $global"
