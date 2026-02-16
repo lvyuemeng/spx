@@ -1,121 +1,175 @@
+# SPX Config - Configuration Management
+# Provides functions for managing SPX configuration files
+
 . "$PSScriptRoot/../context.ps1"
 
-function get_inventory {
-	param ()
-	
-	$apps_path = $Script:scoopExtSubs["apps"]
-	$apps = Get-Content $apps_path | ConvertFrom-Json -AsHashtable
-	if (-Not $apps) {
-		$apps = @{}
-	}
-	# ensure the `scope` field
-	foreach ($scope in @("global", "local")) {
-		if (-Not $apps.ContainsKey($scope)) {
-			$apps[$scope] = @{}
-		}
-	}
-	return $apps
+function Get-LinksConfig {
+    [CmdletBinding()]
+    [OutputType([System.Collections.Hashtable])]
+    param ()
+    
+    $configFile = Get-SpxConfigFile -Name "links.json" -CreateIfMissing
+    
+    # Check if file exists first, then check if it's empty
+    if (-not (Test-Path $configFile)) {
+        return @{
+            "global" = @{}
+            "local"  = @{}
+        }
+    }
+    
+    $fileInfo = Get-Item $configFile -ErrorAction SilentlyContinue
+    if ($null -eq $fileInfo -or $fileInfo.Length -eq 0) {
+        return @{
+            "global" = @{}
+            "local"  = @{}
+        }
+    }
+    
+    try {
+        $content = Get-Content $configFile -Raw
+        $config = $content | ConvertFrom-Json -AsHashtable
+        
+        # Ensure scope fields exist
+        foreach ($scope in @("global", "local")) {
+            if (-not $config.ContainsKey($scope)) {
+                $config[$scope] = @{}
+            }
+        }
+        
+        return $config
+    } catch {
+        Write-Warning "Failed to parse links.json, returning empty config."
+        return @{
+            "global" = @{}
+            "local"  = @{}
+        }
+    }
 }
 
-function set_inventory {
-	param(
-		[Parameter(Mandatory = $true, Position = 0)]
-		[System.Collections.Hashtable]$data
-	)
-	$apps_path = $Script:scoopExtSubs["apps"]
-	$data | ConvertTo-Json -Depth 5 | Set-Content $apps_path
+function Set-LinksConfig {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Hashtable]$Config
+    )
+    
+    $configFile = Get-SpxConfigFile -Name "links.json"
+    $Config | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
 }
 
-<#
-.SYNOPSIS
-	Execute a block with apps config provided
-	Modify the apps config by value/reference
-.PARAMETER block
-	The block to execute
-.PARAMETER ref
-	Whether to pass the apps config by reference
-#>
-function with_inventory {
-	[CmdletBinding()]
-	param (
-		[Parameter(Mandatory = $true, Position = 0)]
-		[scriptblock]$block,
-		[switch]$global,
-		[switch]$ref
-	)
-	
-	$config = get_inventory
-	$scope = if ($global) { "global" } else { "local" }
-	$app_section = $config[$scope]
-	
-	if ($ref) {
-		$appsRef = [ref]$app_section
-		& $block $appsRef
-		# `$appsRef` is modified in place
-		$config[$scope] = $appsRef.Value
-		set_inventory $config
-	}
-	else {
-		$res = & $block $app_section
-		if ($res -is [hashtable]) {
-			$config[$scope] = $res
-			set_inventory $config
-		}
-	}
+function Invoke-WithLinksConfig {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$ScriptBlock,
+        
+        [switch]$Global,
+        [switch]$AsReference
+    )
+    
+    $config = Get-LinksConfig
+    $scope = if ($Global) { "global" } else { "local" }
+    $scopeConfig = $config[$scope]
+    
+    if ($AsReference) {
+        $configRef = [ref]$scopeConfig
+        & $ScriptBlock $configRef
+        $config[$scope] = $configRef.Value
+        Set-LinksConfig $config
+    } else {
+        $result = & $ScriptBlock $scopeConfig
+        if ($result -is [hashtable]) {
+            $config[$scope] = $result
+            Set-LinksConfig $config
+        }
+    }
 }
 
-function update_app_inventory {
-	[CmdletBinding()]
-	param (
-		[Parameter(Mandatory=$true, Position=0)]
-		[string]$appName,
-		[Parameter(Mandatory=$true)]
-		[string]$path,
-		[Parameter(Mandatory=$true)]
-		[string]$ver,
-		[switch]$global
-	)
-
-	with_inventory -Global:$global {
-		param($cfg)
-		if ($cfg.ContainsKey($appName)) {
-			$old_path = $cfg[$appName].Path
-			$tg_app = Join-Path $path $appName
-			$old_tg_app = Join-Path $old_path $appName
-			Write-Debug "[update_app_inventory]: $appName : $old_path -> $path"
-			# remove old app dir
-			if ($old_tg_app -ne $tg_app) {
-				# Assume the old path is safely moved into new path
-				Remove-Item $old_tg_app -Recurse -Force
-			}
-		}
-		$entry = @{
-			Path = $path
-			Version = $ver
-			Updated = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-		}
-		$cfg[$appName] = $entry
-		return $cfg
-	}
+function New-AppLinkEntry {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$AppName,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$Version,
+        
+        [switch]$Global
+    )
+    
+    Invoke-WithLinksConfig -Global:$Global {
+        param($Config)
+        
+        if ($Config.ContainsKey($AppName)) {
+            $oldPath = $Config[$AppName].Path
+            $oldAppDir = Join-Path $oldPath $AppName
+            $newAppDir = Join-Path $Path $AppName
+            
+            Write-Debug "[New-AppLinkEntry]: $AppName : $oldPath -> $Path"
+            
+            # Remove old app directory if different from new
+            if ($oldAppDir -ne $newAppDir -and (Test-Path $oldAppDir)) {
+                Remove-Item $oldAppDir -Recurse -Force
+            }
+        }
+        
+        $entry = @{
+            Path    = $Path
+            Version = $Version
+            Updated = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        }
+        
+        $Config[$AppName] = $entry
+        return $Config
+    }
 }
 
-function remove_pkg_inventory {
-	[CmdletBinding()]
-	param (
-		[Parameter(Mandatory = $true, Position = 0)]
-		[string]$appName,
-		[switch]$global
-	)
-	with_inventory -Global:$global -Ref {
-		param([ref]$cfg)
-		if (-Not $cfg.Value.ContainsKey($appName)) {
-			return
-		}
-		$app = Join-Path $cfg.Value[$appName].Path $appName
-		if (Test-Path $app) {
-			Write-Debug "[remove_pkg_inventory]: remove $app"
-			Remove-Item $app -Recurse -Force
-		}
-		$cfg.Value.Remove($appName)
-	}
+function Remove-AppLinkEntry {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$AppName,
+        
+        [switch]$Global
+    )
+    
+    Invoke-WithLinksConfig -Global:$Global -AsReference {
+        param([ref]$Config)
+        
+        if (-not $Config.Value.ContainsKey($AppName)) {
+            Write-Debug "[Remove-AppLinkEntry]: $AppName not found in config"
+            return
+        }
+        
+        $appDir = Join-Path $Config.Value[$AppName].Path $AppName
+        if (Test-Path $appDir) {
+            Write-Debug "[Remove-AppLinkEntry]: Removing $appDir"
+            Remove-Item $appDir -Recurse -Force
+        }
+        
+        $Config.Value.Remove($AppName)
+    }
+}
+
+function Get-AppLinkEntry {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$AppName,
+        
+        [switch]$Global
+    )
+    
+    $config = Get-LinksConfig
+    $scope = if ($Global) { "global" } else { "local" }
+    
+    if ($config[$scope].ContainsKey($AppName)) {
+        return $config[$scope][$AppName]
+    }
+    
+    return $null
 }

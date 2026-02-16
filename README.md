@@ -1,67 +1,216 @@
-<div align="center">
-	<h1>Scoop Link<h1>
-</div>
+# SPX - Scoop Power Extensions
 
-Scoop-Link(scpl) currently is a simple **custom path** management extension of scoop installer.
+**SPX** (Scoop Power Extensions is a PowerShell-based enhancement toolkit for Scoop that provides orthogonal functionalities not covered by Scoop's core features.
 
-## What does it do?
+## Motivation
 
-It use symbolic link to redirect apps location as it supposed to do. If you can't ensure its safety by my words, you can check its main logic at [move.ps1](lib/move.ps1).
+Scoop is an excellent package manager for Windows, but it has limitations in certain scenarios:
 
-Currently, it use `app.json` in its working directory to record the path. If someone could provide a better design, I would like to refactor it. Thus if you **delete** the `apps.json`, you will **lose** the all information about app paths.
+- **Path constraints**: Installed apps are confined to Scoop's directory structure, making it difficult to place portable apps on separate drives or custom locations
+- **Download issues**: GitHub releases can be slow or inaccessible in restricted regions
+- **Bucket management**: Moving apps between buckets requires manual intervention
+- **Disaster recovery**: No built-in way to backup and restore configurations
 
-Deed:
-
-- It only move the main body of apps.
-- It won't move persist(Usually the location of your personal data) to prevent potential destruction.  
-- It won't move cache which can be cleared by scoop.
-
-## Usage
-
-It provide below commands: `move`, `sync`, `back`.
-
-- `move` will move installed app to your desired place without breaking scoop logic.
-- `sync` will sync the state of `scoop/apps/<app>` in `<your_apps>/<app>` of moved apps for uninstall, update etc...
-- `back` will move installed app back to scoop.
-
-```bash
-scpl move fd -R "D:\MyApps"
-scpl move fd -R "./MyApps"
-scpl sync fd
-scpl sync # sync all moved apps!
-scpl back fd # move app back!
-```
-
-**Caveat**: 
-
-  - You should install scoop first.
-  - You should use `,` to separate apps due to the parse logic of powershell script.
-  - You should place `<[app,]>` always at the first argument due to the **partial** parse logic.
+SPX addresses these gaps with orthogonal features that complement Scoop without duplicating functionality. Each feature is an independent module with clear boundaries, following a "safety first" approach where destructive operations require confirmation and all operations are reversible where possible.
 
 ## Installation
 
-### Scoop
+### Prerequisites
 
-Currently, you can copy and paste below or check the repo for this [manifest](scoop-link.json):
+- Windows 10 or later
+- PowerShell 5.1 or later
+- [Scoop](https://scoop.sh/) package manager
 
-```bash
-scoop install https://raw.githubusercontent.com/lvyuemeng/Scoop-Link/master/scoop-link.json
-scoop update # update to newest version
+### Install via Scoop (Recommended)
+
+```powershell
+scoop bucket add spx https://github.com/yourusername/spx
+scoop install spx
 ```
 
-### Manual
+### Manual Installation
 
-You can clone the repo directly and read the help.
-```shell
-git clone https://github.com/lvyuemeng/Scoop-Link.git \
-cd Scoop-Link \
-.\scpl --help
+1. Clone this repository to your preferred location:
+   ```powershell
+   git clone https://github.com/yourusername/spx.git
+   ```
+
+2. Add the SPX directory to your PATH, or create an alias:
+   ```powershell
+   Set-Alias -Name spx -Value "path\to\spx\spx.ps1"
+   ```
+
+## Usage
+
+### Global Options
+
+```
+-h, --help       Show help
+-v, --verbose    Enable verbose output
+-d, --debug      Enable debug output
+--global         Operate on global apps
+--yes            Skip confirmation prompts
 ```
 
-## Why Bother?
+### LINK Module - Custom Path Management
 
-It's a long-term issue on scoop that why it can't support custom location installation. Some people say that it should be managed by scoop itself, but due to the design of windows system, I guess manys want a independent storage of apps. So I made it.
+Relocate installed packages to custom paths via symbolic links.
 
-## ⚖️ License
+```powershell
+# Move app to custom path
+spx link 7zip --path D:\MyPortableApps
 
-[Apache 2.0 License](/LICENSE-Apache) Or [MIT License](/LICENSE-MIT) - Copyright (C)
+# Restore app to Scoop directory
+spx unlink 7zip
+
+# List all linked apps
+spx linked
+
+# Sync linked app states
+spx sync 7zip
+spx sync  # sync all linked apps
+```
+
+### MIRROR Module - Download Source Management
+
+Configure alternative download mirrors for packages.
+
+```powershell
+# List configured mirrors
+spx mirror list
+
+# Add mirror rule
+spx mirror add "github.com/*" "https://mirror.ghproxy.com/"
+
+# Remove mirror rule
+spx mirror remove "github.com/*"
+
+# Enable/disable mirror system
+spx mirror enable
+spx mirror disable
+
+# Test mirror connectivity
+spx mirror test "github.com/*"
+
+# Show current mirror status
+spx mirror status
+```
+
+### SOURCE Module - Installed App Source Management
+
+Change or manage the bucket/source of installed applications.
+
+```powershell
+# List all apps with their sources
+spx source list
+
+# Show detailed source info for app
+spx source show 7zip
+
+# Change app to different bucket
+spx source change 7zip extras
+
+# Verify app manifest matches bucket
+spx source verify 7zip
+
+# Compare installed vs bucket manifest
+spx source diff 7zip extras
+```
+
+### BACKUP Module - Configuration Backup & Restore
+
+Export and import Scoop configuration for migration or disaster recovery.
+
+```powershell
+# Create backup archive
+spx backup create
+spx backup create D:\Backups --IncludePersist
+
+# Restore from backup
+spx backup restore spx-backup-2024-01-15.zip
+
+# List available backups
+spx backup list
+
+# Show backup status
+spx backup status
+```
+
+## Configuration
+
+SPX stores its configuration in the Scoop directory:
+
+| Config Type | Location |
+|-------------|----------|
+| SPX Config | `$env:SCOOP\spx\` or `~/scoop/spx/` |
+| Global Config | `$env:SCOOP_GLOBAL\spx\` or `~/scoop/apps/spx/` |
+| Links Registry | `$env:SCOOP\spx\links.json` |
+| Mirror Rules | `$env:SCOOP\spx\mirrors.json` |
+| Backups | `$env:SCOOP\spx\backups\` |
+
+## Migration from Legacy (scpl)
+
+SPX is the successor to the legacy scpl tool. The command mapping is:
+
+| Old (scpl) | New (spx) |
+|------------|-----------|
+| `scpl move <app> -R <path>` | `spx link <app> --path <path>` |
+| `scpl back <app>` | `spx unlink <app>` |
+| `scpl list` | `spx linked` |
+| `scpl sync <app>` | `spx sync <app>` |
+
+## Architecture
+
+```
+spx/
+├── spx.ps1              # CLI entry point
+├── context.ps1          # Scoop context resolution
+├── lib/
+│   ├── Core.ps1         # Shared utilities
+│   ├── Parse.ps1        # Argument parsing
+│   └── Config.ps1       # Configuration management
+├── modules/
+│   ├── Link/            # Custom path management
+│   ├── Mirror/          # Download source management
+│   ├── Source/          # Installed app source management
+│   └── Backup/          # Configuration backup/restore
+└── exec/
+    ├── Link.ps1         # Link command executor
+    ├── Mirror.ps1       # Mirror command executor
+    ├── Source.ps1       # Source command executor
+    └── Backup.ps1       # Backup command executor
+```
+
+## Development
+
+### Design Philosophy
+
+1. **Orthogonality**: SPX features complement Scoop without duplicating functionality
+2. **Modularity**: Each feature is an independent module with clear boundaries
+3. **Safety First**: Destructive operations require confirmation; all operations are reversible where possible
+4. **Transparency**: Clear logging and status reporting for all operations
+5. **Stateless by Default**: Modules should not record state unless absolutely necessary
+
+### Function Naming Convention
+
+SPX follows canonical Microsoft PowerShell naming conventions (Verb-Noun):
+
+| Verb | Purpose | Example |
+|------|---------|---------|
+| `Get-` | Retrieve data | `Get-AppLink` |
+| `Set-` | Modify configuration | `Set-MirrorRule` |
+| `New-` | Create new resource | `New-AppLink` |
+| `Remove-` | Delete resource | `Remove-AppLink` |
+| `Test-` | Validate/Check | `Test-AppLinked` |
+| `Invoke-` | Execute operation | `Invoke-AppSync` |
+| `Export-` | Export data | `Export-Backup` |
+| `Import-` | Import data | `Import-Backup` |
+
+## License
+
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-Apache](LICENSE-Apache))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.

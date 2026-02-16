@@ -1,76 +1,114 @@
-<#
-.SYNOPSIS
-	Parse command options greedily
-	It will return a dict of flags and the residual of unknown args
-.PARAMETER flags
-	A list of flags start with '-'
-.PARAMETER args
-	A list of args
-#>
-function opts {
-	[CmdletBinding()]
-	[OutputType([string[]], [System.Collections.Hashtable])]
-	param(
-		[string[]]$flags,
-		[Parameter(ValueFromRemainingArguments = $true)]
-		$args
-	)
-	
-	if (-not $args -or $args.Count -eq 0) {
-		return @{}, @()
-	}
-    
-	$pkgs = @()
-	$flags_in = @{}
-	$i = 0
-    
-	while ($i -lt $args.Count) {
-		$cur = $args[$i]
+# SPX Parse - Argument Parsing Utilities
+# Provides functions for parsing command-line arguments
+
+function Get-ParsedOptions {
+    [CmdletBinding()]
+    [OutputType([System.Collections.Hashtable])]
+    param (
+        [string[]]$Flags,
         
-		# flag
-		if ($cur.StartsWith('-')) {
-			$values = @()
-			$i++
-			# absorb flag values
-			while ($i -lt $args.Count -and -not $args[$i].StartsWith('-')) {
-				$values += $args[$i]
-				$i++
-			}
-			switch ($values.Count) {
-				0 { $flags_in[$cur] = $true }
-				1 { $flags_in[$cur] = $values[0] }
-				Default { $flags_in[$cur] = $values }
-			}
-		}
-		# pkg
-		else {
-			$pkgs += $cur
-			$i++
-		}
-	}
+        [Parameter(ValueFromRemainingArguments = $true)]
+        $Arguments
+    )
     
-	$pkgs, $flags_in
+    if (-not $Arguments -or $Arguments.Count -eq 0) {
+        return @{
+            Packages = @()
+            Options  = @{}
+        }
+    }
+    
+    $packages = @()
+    $options = @{}
+    $i = 0
+    
+    while ($i -lt $Arguments.Count) {
+        $current = $Arguments[$i]
+        
+        if ($current.StartsWith('-')) {
+            # Parse flag
+            $values = @()
+            $i++
+            
+            # Collect flag values until next flag or end
+            while ($i -lt $Arguments.Count -and -not $Arguments[$i].StartsWith('-')) {
+                $values += $Arguments[$i]
+                $i++
+            }
+            
+            # Store based on value count
+            switch ($values.Count) {
+                0 { $options[$current] = $true }
+                1 { $options[$current] = $values[0] }
+                Default { $options[$current] = $values }
+            }
+        } else {
+            # Parse package name
+            $packages += $current
+            $i++
+        }
+    }
+    
+    return @{
+        Packages = $packages
+        Options  = $options
+    }
 }
 
-# avoid object[] fuzzy problem in @args splatting
-# flatten args and invoke expression to execute
-function flatten_exec {
-	param(
-		[string]$command,
-		[Parameter(ValueFromRemainingArguments = $true)]
-		$args
-	)
-			
-	$format = foreach ($arg in $args) {
-		if (-Not $arg) {
-			""
-		}
-		elseif ($arg -is [array] -or ($arg -is [System.Collections.IEnumerable] -and $arg -isnot [string])) {
-			$arg -join ", "
-		}
-		else {
-			$arg.ToString()
-		}
-	}
-	Invoke-Expression "$command $format"
+function Invoke-ScriptWithArgs {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptPath,
+        
+        [Parameter(ValueFromRemainingArguments = $true)]
+        $Arguments
+    )
+    
+    # Flatten arguments for proper invocation
+    $formattedArgs = foreach ($arg in $Arguments) {
+        if (-not $arg) {
+            ""
+        } elseif ($arg -is [array] -or ($arg -is [System.Collections.IEnumerable] -and $arg -isnot [string])) {
+            $arg -join ", "
+        } else {
+            $arg.ToString()
+        }
+    }
+    
+    $command = "$ScriptPath $($formattedArgs -join ' ')"
+    Write-Debug "[Invoke-ScriptWithArgs]: $command"
+    
+    Invoke-Expression $command
+}
+
+function Test-PathValid {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+    
+    # Check if path is a valid container path and doesn't contain "scoop"
+    if ((Test-Path $Path -PathType Container -IsValid) -and (-not $Path.Contains("scoop"))) {
+        return $true
+    }
+    
+    return $false
+}
+
+function Resolve-TargetPath {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+    
+    if (-not (Test-PathValid $Path)) {
+        Write-Error "Path '$Path' is not a valid directory path or contains 'scoop'." -ErrorAction Stop
+        return $null
+    }
+    
+    return [System.IO.Path]::GetFullPath($Path)
 }

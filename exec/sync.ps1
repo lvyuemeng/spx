@@ -1,30 +1,33 @@
-param(
+# SPX Sync Command Executor
+# Handles the 'spx sync' command - syncs linked app states
+
+param (
     [Parameter(ValueFromRemainingArguments = $true)]
-    $args
+    $Args
 )
 
-. "$PSScriptRoot/../lib/parse.ps1"
-. "$PSScriptRoot/../lib/config.ps1"
-. "$PSScriptRoot/../lib/move.ps1"
+. "$PSScriptRoot/../lib/Parse.ps1"
+. "$PSScriptRoot/../modules/Link/Link.ps1"
 
-Write-Debug "[sync]: args: $args, count: $($args.Count)"
+Write-Debug "[sync]: Args: $Args, Count: $($Args.Count)"
 
-$pkgs, $opts = opts "--global", "-g", $args
+# Parse arguments
+$parsed = Get-ParsedOptions -Flags @("--global", "-g") -Arguments $Args
+$pkgs = $parsed.Packages
+$opts = $parsed.Options
+
 $global = $opts["--global"] -or $opts["-g"]
-Write-Debug "[sync]: pkgs: $pkgs"
-Write-Debug "[sync]: global: $global"
 
-$cfg = get_inventory
-$cfg = if ($global) { $cfg["global"] } else { $cfg["local"] }
+Write-Debug "[sync]: Packages: $pkgs"
+Write-Debug "[sync]: Global: $global"
 
-$sync_apps = if (-Not $pkgs) { 
-    $cfg.Keys 
-}
-else { 
-    $pkgs | Where-Object { $cfg.ContainsKey($_) }
-}
-foreach ($pkg in $sync_apps) {
-    $path = $cfg[$pkg].Path
-    Write-Debug "[sync]: app: $pkg; path: $path"
-    move_pkg $pkg $path -Global:$global
+# If no packages specified, sync all linked apps
+if ($pkgs.Count -eq 0) {
+    Write-Host "Syncing all linked apps..."
+    Invoke-AppSync -Global:$global
+} else {
+    # Sync specified packages
+    foreach ($pkg in $pkgs) {
+        Invoke-AppSync -AppName $pkg -Global:$global
+    }
 }

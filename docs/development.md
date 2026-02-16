@@ -1,6 +1,6 @@
 # Development
 
-This document records the development of `scoop-link`(`scpl`).
+This document records the development of `spx`.
 
 ## CLI
 
