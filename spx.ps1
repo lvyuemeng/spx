@@ -80,12 +80,8 @@ $commandMap = @{
     "unlink"  = "unlink"
     "linked"  = "linked"
     "sync"    = "sync"
-    # Legacy aliases for backward compatibility
-    "move"    = "link"
-    "mv"      = "link"
-    "back"    = "unlink"
-    "list"    = "linked"
-    "ls"      = "linked"
+    "source"  = "source"
+    "backup"  = "backup"
 }
 
 $helpFlags = @("-h", "--help", "/?")

@@ -1,13 +1,12 @@
 # SPX - Scoop Power Extensions
 
-**SPX** (Scoop Power Extensions is a PowerShell-based enhancement toolkit for Scoop that provides orthogonal functionalities not covered by Scoop's core features.
+**SPX** (Scoop Power Extensions) is a PowerShell-based enhancement toolkit for Scoop that provides orthogonal functionalities not covered by Scoop's core features.
 
 ## Motivation
 
 Scoop is an excellent package manager for Windows, but it has limitations in certain scenarios:
 
 - **Path constraints**: Installed apps are confined to Scoop's directory structure, making it difficult to place portable apps on separate drives or custom locations
-- **Download issues**: GitHub releases can be slow or inaccessible in restricted regions
 - **Bucket management**: Moving apps between buckets requires manual intervention
 - **Disaster recovery**: No built-in way to backup and restore configurations
 
@@ -24,7 +23,7 @@ SPX addresses these gaps with orthogonal features that complement Scoop without 
 ### Install via Scoop (Recommended)
 
 ```powershell
-scoop bucket add spx https://github.com/yourusername/spx
+scoop bucket add spx https://github.com/lvyuemeng/spx
 scoop install spx
 ```
 
@@ -32,7 +31,7 @@ scoop install spx
 
 1. Clone this repository to your preferred location:
    ```powershell
-   git clone https://github.com/yourusername/spx.git
+   git clone https://github.com/lvyuemeng/spx.git
    ```
 
 2. Add the SPX directory to your PATH, or create an alias:
@@ -69,31 +68,6 @@ spx linked
 # Sync linked app states
 spx sync 7zip
 spx sync  # sync all linked apps
-```
-
-### MIRROR Module - Download Source Management
-
-Configure alternative download mirrors for packages.
-
-```powershell
-# List configured mirrors
-spx mirror list
-
-# Add mirror rule
-spx mirror add "github.com/*" "https://mirror.ghproxy.com/"
-
-# Remove mirror rule
-spx mirror remove "github.com/*"
-
-# Enable/disable mirror system
-spx mirror enable
-spx mirror disable
-
-# Test mirror connectivity
-spx mirror test "github.com/*"
-
-# Show current mirror status
-spx mirror status
 ```
 
 ### SOURCE Module - Installed App Source Management
@@ -145,7 +119,6 @@ SPX stores its configuration in the Scoop directory:
 | SPX Config | `$env:SCOOP\spx\` or `~/scoop/spx/` |
 | Global Config | `$env:SCOOP_GLOBAL\spx\` or `~/scoop/apps/spx/` |
 | Links Registry | `$env:SCOOP\spx\links.json` |
-| Mirror Rules | `$env:SCOOP\spx\mirrors.json` |
 | Backups | `$env:SCOOP\spx\backups\` |
 
 ## Migration from Legacy (scpl)
@@ -171,12 +144,13 @@ spx/
 │   └── Config.ps1       # Configuration management
 ├── modules/
 │   ├── Link/            # Custom path management
-│   ├── Mirror/          # Download source management
 │   ├── Source/          # Installed app source management
 │   └── Backup/          # Configuration backup/restore
 └── exec/
     ├── Link.ps1         # Link command executor
-    ├── Mirror.ps1       # Mirror command executor
+    ├── Unlink.ps1       # Unlink command executor
+    ├── Linked.ps1       # Linked command executor
+    ├── Sync.ps1         # Sync command executor
     ├── Source.ps1       # Source command executor
     └── Backup.ps1       # Backup command executor
 ```
@@ -198,7 +172,7 @@ SPX follows canonical Microsoft PowerShell naming conventions (Verb-Noun):
 | Verb | Purpose | Example |
 |------|---------|---------|
 | `Get-` | Retrieve data | `Get-AppLink` |
-| `Set-` | Modify configuration | `Set-MirrorRule` |
+| `Set-` | Modify configuration | `Set-Config` |
 | `New-` | Create new resource | `New-AppLink` |
 | `Remove-` | Delete resource | `Remove-AppLink` |
 | `Test-` | Validate/Check | `Test-AppLinked` |
@@ -212,5 +186,3 @@ Licensed under either of
 
 - Apache License, Version 2.0 ([LICENSE-Apache](LICENSE-Apache))
 - MIT license ([LICENSE-MIT](LICENSE-MIT))
-
-at your option.
