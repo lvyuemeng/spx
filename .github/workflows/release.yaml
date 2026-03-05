@@ -104,7 +104,7 @@ jobs:
           $hash = (Get-FileHash -Path $zipName -Algorithm SHA256).Hash.ToLower()
           Write-Host "SHA256 Hash: $hash"
           
-          # Update scoop manifest with version and hash
+          # Update scoop manifest with version
           $manifest = Get-Content -Path "spx.json" -Raw
           $manifest = $manifest -replace 'VERSION_PLACEHOLDER', $version
           $manifest | Set-Content -Path "spx.json" -Encoding UTF8
