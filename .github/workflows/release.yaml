@@ -47,7 +47,12 @@ jobs:
           
           $changelog = "## What's Changed`n`n$log`n`n---`n`n**Full Changelog**: https://github.com/${{ github.repository }}/compare/$previous...$current"
           
-          $changelog | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8
+          # Write to GITHUB_OUTPUT using heredoc format
+          @"
+          CHANGELOG<<EOF
+          $changelog
+          EOF
+          "@ | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8
         shell: pwsh
 
       - name: Prepare Release Assets
