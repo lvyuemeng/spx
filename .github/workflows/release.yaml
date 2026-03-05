@@ -127,11 +127,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Commit Updated Manifest
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add spx.json
-          git diff --cached --quiet || git commit -m "chore: update scoop manifest for ${{ env.RELEASE_TAG }}"
-          git push origin HEAD:main
-        shell: pwsh
+      # Note: Commit step skipped - repository requires PRs for direct pushes
+      # The spx.json is uploaded as a release asset for manual PR creation
