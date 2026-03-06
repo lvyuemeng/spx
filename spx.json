@@ -4,11 +4,13 @@
     "homepage": "https://github.com/lvyuemeng/spx",
     "license": "Apache-2.0|MIT",
     "url": "https://github.com/lvyuemeng/spx/archive/refs/tags/VERSION_PLACEHOLDER.zip?download=spx.zip",
+    "extract_dir": "spx-VERSION_PLACEHOLDER",
     "bin": "spx.ps1",
     "checkver": {
         "github": "https://github.com/lvyuemeng/spx"
     },
     "autoupdate": {
-        "url": "https://github.com/lvyuemeng/spx/archive/refs/tags/$version.zip?download=spx.zip"
+        "url": "https://github.com/lvyuemeng/spx/archive/refs/tags/$version.zip?download=spx.zip",
+        "extract_dir": "spx-$version"
     }
 }
