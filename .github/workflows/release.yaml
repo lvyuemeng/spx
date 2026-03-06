@@ -88,5 +88,5 @@ jobs:
               title: 'Update spx.json to ${{ env.RELEASE_TAG }}',
               body: 'Update spx.json to ${{ env.RELEASE_TAG }} for Scoop release',
               head: 'release-${{ env.RELEASE_TAG }}',
-              base: 'main'
+              base: 'master'
             })
