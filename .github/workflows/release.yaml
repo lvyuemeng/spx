@@ -5,73 +5,56 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   release:
-    runs-on: windows-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-      pull-requests: write
-    env:
-      RELEASE_TAG: ${{ github.ref_name }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: refs/tags/${{ env.RELEASE_TAG }}
-          fetch-tags: true
 
-      - name: Get previous tag
-        id: prevtag
+      - name: Get version from tag
+        id: get_version
         run: |
-          $tags = git tag --sort=-v:refname
-          $current = "${{ env.RELEASE_TAG }}"
-          $previous = ($tags -split "`n" | Where-Object { $_ -ne $current -and $_ -ne "" } | Select-Object -First 1)
-          if (-not $previous) { $previous = $current }
-          echo "PREVIOUS_TAG=$previous" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8
-        shell: pwsh
+          # Keep 'v' prefix in version
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          $current = "${{ env.RELEASE_TAG }}"
-          $previous = "${{ steps.prevtag.outputs.PREVIOUS_TAG }}"
-          
-          $log = git log --no-merges --pretty=format:"- %s (%h)" "$previous..$current"
-          if (-not $log) {
-            $log = git log --no-merges --pretty=format:"- %s (%h)" -n 10
-          }
-          
-          $changelog = "## What's Changed`n`n$log`n`n---`n`n**Full Changelog**: https://github.com/${{ github.repository }}/compare/$previous...$current"
-          
-          # Write to GITHUB_OUTPUT using heredoc format
-          @"
-          CHANGELOG<<EOF
-          $changelog
-          EOF
-          "@ | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8
-        shell: pwsh
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          name: SPX ${{ steps.get_version.outputs.VERSION }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-rc') || contains(steps.get_version.outputs.VERSION, '-beta') || contains(steps.get_version.outputs.VERSION, '-alpha') }}
 
-      - name: Update Scoop Manifest
-        id: prepare
+      - name: Update Scoop manifest
         run: |
-          $version = "${{ env.RELEASE_TAG }}"
+          VERSION=${{ steps.get_version.outputs.VERSION }}
           
-          # Update scoop manifest version using jq
-          jq --arg version "$version" '.version = $version' spx.json | Set-Content -Path spx.json -Encoding UTF8
-          
-          Write-Host "Updated scoop manifest:"
-          Get-Content -Path "spx.json"
-        shell: pwsh
+          # Update spx.json using jq
+          jq --arg version "$VERSION" \
+             --arg url "https://github.com/lvyuemeng/spx/archive/refs/tags/$VERSION.zip" \
+             '.version = $version | .url = $url' \
+             spx.json > spx.json.tmp && mv spx.json.tmp spx.json
 
-      - name: Commit manifest changes
+      - name: Commit updated manifest
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add spx.json
-          git commit -m "Update spx.json to ${{ env.RELEASE_TAG }}"
+          git commit -m "chore: update scoop manifest for ${{ steps.get_version.outputs.VERSION }}" || echo "No changes to commit"
+          
+      - name: Push changes
+        run: |
+          # Push to master branch with full refname
+          git push origin HEAD:refs/heads/master
