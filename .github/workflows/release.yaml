@@ -75,3 +75,4 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add spx.json
           git commit -m "Update spx.json to ${{ env.RELEASE_TAG }}"
+          git push origin HEAD:main
