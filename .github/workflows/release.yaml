@@ -39,7 +39,8 @@ jobs:
       - name: Update Scoop manifest
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
-          jq --arg version "$VERSION" --arg url "https://github.com/lvyuemeng/spx/archive/refs/tags/$VERSION.zip?download=spx.zip" '.version = $version | .url = $url' spx.json > spx.json.tmp && mv spx.json.tmp spx.json
+          URL="https://github.com/lvyuemeng/spx/archive/refs/tags/${VERSION}.zip?download=spx.zip"
+          jq --arg version "$VERSION" --arg url "$URL" '.version = $version | .url = $url' spx.json > spx.json.tmp && mv spx.json.tmp spx.json
 
       - name: Commit updated manifest
         run: |
