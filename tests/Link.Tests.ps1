@@ -13,7 +13,7 @@ BeforeAll {
         function Get-SpxConfigPath { param() }
     }
     if (-not (Get-Command 'Get-SpxConfigFile' -ErrorAction SilentlyContinue)) {
-        function Get-SpxConfigFile { param($Name, $CreateIfMissing) }
+        function Get-SpxConfigFile { param($Name, [switch]$CreateIfMissing) }
     }
     
     # Mock context functions
@@ -21,7 +21,7 @@ BeforeAll {
     Mock Get-ScoopGlobalContext { return "TestDrive:\scoop\global" }
     Mock Get-SpxConfigPath { return "TestDrive:\scoop\spx" }
     Mock Get-SpxConfigFile { 
-        param($Name, $CreateIfMissing)
+        param($Name, [switch]$CreateIfMissing)
         return "TestDrive:\scoop\spx\$Name" 
     }
     
@@ -29,7 +29,7 @@ BeforeAll {
     . "$PSScriptRoot/../context.ps1"
     . "$PSScriptRoot/../lib/Core.ps1"
     . "$PSScriptRoot/../lib/Config.ps1"
-    . "$PSScriptRoot/../modules/Link/Move.ps1"
+    . "$PSScriptRoot/../lib/Link.ps1"
 }
 
 Describe "Get-PersistDefinition" {
@@ -54,7 +54,7 @@ Describe "Get-PersistDefinition" {
 
 Describe "Test-AppLinked" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Link/Link.ps1"
+        . "$PSScriptRoot/../lib/Link.ps1"
         
         Mock Get-AppLinkEntry {
             param($AppName)
@@ -78,7 +78,7 @@ Describe "Test-AppLinked" {
 
 Describe "Get-AppLinkList" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Link/Link.ps1"
+        . "$PSScriptRoot/../lib/Link.ps1"
         
         Mock Get-LinksConfig {
             return @{
@@ -105,7 +105,7 @@ Describe "Get-AppLinkList" {
 
 Describe "Invoke-AppSync" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Link/Link.ps1"
+        . "$PSScriptRoot/../lib/Link.ps1"
         
         Mock Get-AppLinkList {
             return @{
@@ -115,6 +115,7 @@ Describe "Invoke-AppSync" {
         }
         Mock Update-PersistLinks { }
         Mock Test-AppLinked { return $true }
+        Mock Test-AppInstalled { return $true }
     }
     
     It "Should sync single app when AppName provided" {
@@ -129,5 +130,129 @@ Describe "Invoke-AppSync" {
         Invoke-AppSync -AppName "notlinked" -WarningVariable warnings
         
         $warnings | Should -Not -BeNullOrEmpty
+    }
+}
+
+Describe "Get-AppManifest" {
+    BeforeAll {
+        # Source Link.ps1 to get the function definition (includes Move functions)
+        . "$PSScriptRoot/../lib/Link.ps1"
+    }
+    
+    It "Should return null when app version not found" {
+        Mock Get-AppCurrentVersion { return $null }
+        
+        $result = Get-AppManifest -AppName "nonexistent"
+        $result | Should -BeNullOrEmpty
+    }
+    
+    It "Should return null when no manifest files exist" {
+        Mock Get-AppCurrentVersion { return [PSCustomObject]@{ FullName = "TestDrive:\scoop\apps\testapp\21.07" } }
+        Mock Test-Path { return $false }
+        
+        $result = Get-AppManifest -AppName "testapp"
+        $result | Should -BeNullOrEmpty
+    }
+}
+
+Describe "Update-PersistLinks" {
+    BeforeAll {
+        . "$PSScriptRoot/../lib/Link.ps1"
+    }
+    
+    It "Should return null when app not installed" {
+        Mock Get-AppCurrentVersion { return $null }
+        
+        $result = Update-PersistLinks -AppName "nonexistent"
+        $result | Should -BeNullOrEmpty
+    }
+    
+    It "Should return version when no persist defined" {
+        Mock Get-AppCurrentVersion { return [PSCustomObject]@{ FullName = "TestDrive:\scoop\apps\testapp\21.07" } }
+        Mock Get-AppManifest { return @{ version = "21.07" } }
+        Mock Get-AppDirectory { return "TestDrive:\scoop\persist\testapp" }
+        Mock Test-Path { return $true }
+        
+        $result = Update-PersistLinks -AppName "testapp"
+        $result | Should -Not -BeNullOrEmpty
+    }
+    
+    It "Should create persist directory if not exists" {
+        Mock Get-AppCurrentVersion { return [PSCustomObject]@{ FullName = "TestDrive:\scoop\apps\testapp\21.07" } }
+        Mock Get-AppManifest { return @{ persist = @("config") } }
+        Mock Get-AppDirectory { return "TestDrive:\scoop\persist\testapp" }
+        Mock Test-Path { return $false }
+        Mock New-Item { }
+        
+        Update-PersistLinks -AppName "testapp"
+        
+        Should -Invoke New-Item -ParameterFilter { $ItemType -eq "Directory" } -Times 1
+    }
+    
+    It "Should create symbolic link for persist path" {
+        Mock Get-AppCurrentVersion { return [PSCustomObject]@{ FullName = "TestDrive:\scoop\apps\testapp\21.07" } }
+        Mock Get-AppManifest { return @{ persist = @("config") } }
+        Mock Get-AppDirectory { return "TestDrive:\scoop\persist\testapp" }
+        Mock Test-Path { return $false }
+        Mock New-Item { }
+        
+        Update-PersistLinks -AppName "testapp"
+        
+        Should -Invoke New-Item -ParameterFilter { $ItemType -eq "SymbolicLink" } -Times 1
+    }
+}
+
+Describe "Get-StaleLinkEntries" {
+    BeforeAll {
+        . "$PSScriptRoot/../lib/Link.ps1"
+    }
+    
+    It "Should return empty when no stale entries" {
+        Mock Get-LinksConfig {
+            return @{
+                "local" = @{ "existingapp" = @{ Path = "D:\Apps"; Version = "1.0.0" } }
+                "global" = @{}
+            }
+        }
+        Mock Get-AppDirectory { return "TestDrive:\scoop\apps\existingapp" }
+        Mock Test-Path { return $true }
+        
+        $result = Get-StaleLinkEntries
+        $result.local.Count | Should -Be 0
+    }
+    
+    It "Should detect stale entries when app directory doesn't exist" {
+        Mock Get-LinksConfig {
+            return @{
+                "local" = @{ "deletedapp" = @{ Path = "D:\Apps"; Version = "2.0.0" } }
+                "global" = @{}
+            }
+        }
+        Mock Get-AppDirectory { return "TestDrive:\scoop\apps\deletedapp" }
+        Mock Test-Path { return $false }
+        
+        $result = Get-StaleLinkEntries
+        $result.local.Count | Should -Be 1
+        $result.local[0].AppName | Should -Be "deletedapp"
+    }
+}
+
+Describe "Remove-StaleLinkEntry" {
+    BeforeAll {
+        . "$PSScriptRoot/../lib/Link.ps1"
+    }
+    
+    It "Should remove entry from config" {
+        Mock Get-LinksConfig {
+            return @{
+                "local" = @{ "testapp" = @{ Path = "D:\Apps"; Version = "1.0.0" } }
+                "global" = @{}
+            }
+        }
+        Mock Set-LinksConfig { }
+        
+        Remove-StaleLinkEntry -AppName "testapp"
+        
+        Should -Invoke Set-LinksConfig
     }
 }

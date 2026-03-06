@@ -29,7 +29,7 @@ BeforeAll {
 
 Describe "Get-AppSource" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Source/Source.ps1"
+        . "$PSScriptRoot/../lib/Source.ps1"
         
         # Mock functions
         Mock Test-AppInstalled { return $true } -ParameterFilter { $AppName -eq "testapp" }
@@ -80,7 +80,7 @@ Describe "Get-AppSource" {
 
 Describe "Test-AppInBucket" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Source/Source.ps1"
+        . "$PSScriptRoot/../lib/Source.ps1"
         
         # Create a test bucket with a manifest
         $testBucket = "testbucket"
@@ -119,7 +119,7 @@ Describe "Test-AppInBucket" {
 
 Describe "Get-BucketManifest" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Source/Source.ps1"
+        . "$PSScriptRoot/../lib/Source.ps1"
         
         # Create a test bucket with a manifest
         $testBucket = "manifestbucket"
@@ -160,7 +160,7 @@ Describe "Get-BucketManifest" {
 
 Describe "Get-BucketList" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Source/Source.ps1"
+        . "$PSScriptRoot/../lib/Source.ps1"
         
         # Create test buckets
         $bucketsPath = "TestDrive:\scoop\buckets"
@@ -187,7 +187,7 @@ Describe "Get-BucketList" {
 
 Describe "Compare-AppManifest" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Source/Source.ps1"
+        . "$PSScriptRoot/../lib/Source.ps1"
         
         # Create test app with install.json
         $testAppName = "compareapp"
@@ -250,7 +250,7 @@ Describe "Compare-AppManifest" {
 
 Describe "Test-AppSourceValid" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Source/Source.ps1"
+        . "$PSScriptRoot/../lib/Source.ps1"
         
         # Create valid app
         $validApp = "validapp"

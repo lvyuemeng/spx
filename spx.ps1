@@ -11,6 +11,12 @@ param (
 
 $ErrorActionPreference = "Stop"
 
+# Handle debug flag early
+if ($RemainingArgs -contains "-d" -or $RemainingArgs -contains "--debug" -or $RemainingArgs -contains "-Debug") {
+    $DebugPreference = "Continue"
+    $RemainingArgs = $RemainingArgs | Where-Object { $_ -notin @("-d", "--debug", "-Debug") }
+}
+
 # Source dependencies
 . "$PSScriptRoot/context.ps1"
 . "$PSScriptRoot/lib/Parse.ps1"
@@ -27,7 +33,6 @@ Modules:
   link    Relocate apps to custom paths via symbolic links
   mirror  Configure alternative download mirrors
   source  Manage app bucket sources
-  backup  Export/import configurations
 
 Global Options:
   -h, --help       Show help
@@ -59,6 +64,46 @@ Examples:
   spx unlink 7zip
   spx linked
 '@
+    
+    mirror = @'
+SPX Mirror - Bucket URL Replacement
+
+Usage:
+  spx mirror list                    List all bucket mirrors
+  spx mirror add <bucket> <url>      Add a mirror for a bucket
+  spx mirror remove <bucket>         Remove a bucket mirror
+  spx mirror set <bucket> <url>     Set/change mirror URL for a bucket
+
+Options:
+  -h, --help      Show this help
+
+Examples:
+  spx mirror list
+  spx mirror add main https://mirror.example.com/scoop
+  spx mirror set main https://new-mirror.com/scoop
+  spx mirror remove main
+'@
+    
+    source = @'
+SPX Source - Bucket Source Management
+
+Usage:
+  spx source list                         List all bucket sources
+  spx source show <app>                   Show source for an app
+  spx source change <app> <bucket>        Change source for an app
+  spx source verify <app>                 Verify source for an app
+  spx source diff <app> <bucket>           Show source difference
+  spx source add <bucket> [url]           Add a new bucket
+  spx source remove <bucket>              Remove a bucket
+
+Options:
+  -h, --help      Show this help
+
+Examples:
+  spx source list
+  spx source show 7zip
+  spx source change 7zip main
+'@
 }
 
 function Show-Help {
@@ -80,8 +125,9 @@ $commandMap = @{
     "unlink"  = "unlink"
     "linked"  = "linked"
     "sync"    = "sync"
+    "cleanup" = "cleanup"
+    "mirror"  = "mirror"
     "source"  = "source"
-    "backup"  = "backup"
 }
 
 $helpFlags = @("-h", "--help", "/?")

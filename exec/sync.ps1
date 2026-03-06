@@ -7,7 +7,7 @@ param (
 )
 
 . "$PSScriptRoot/../lib/Parse.ps1"
-. "$PSScriptRoot/../modules/Link/Link.ps1"
+. "$PSScriptRoot/../modules/Link.ps1"
 
 Write-Debug "[sync]: Args: $Args, Count: $($Args.Count)"
 

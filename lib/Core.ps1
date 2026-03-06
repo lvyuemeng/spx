@@ -1,6 +1,35 @@
 # SPX Core - Shared Utilities
 # Provides common utility functions for SPX modules
 
+function ConvertFrom-JsonWithFallback {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [string]$InputObject
+    )
+    
+    process {
+        if (-not $InputObject) { return @{} }
+        
+        try {
+            # For PS 7+, use -AsHashtable parameter for native hashtable output
+            if ($PSVersionTable.PSVersion.Major -ge 7) {
+                return $InputObject | ConvertFrom-Json -AsHashtable
+            } else {
+                # For PS 5.x, convert PSObject to hashtable
+                $obj = $InputObject | ConvertFrom-Json
+                $config = @{}
+                $obj.PSObject.Properties | ForEach-Object { $config[$_.Name] = $_.Value }
+                return $config
+            }
+        } catch {
+            Write-Warning "Failed to parse JSON: $_"
+            return @{}
+        }
+    }
+}
+
 function Test-Administrator {
     [CmdletBinding()]
     [OutputType([bool])]

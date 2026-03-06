@@ -16,7 +16,6 @@ SPX addresses these gaps with orthogonal features that complement Scoop without 
 
 ### Prerequisites
 
-- Windows 10 or later
 - PowerShell 5.1 or later
 - [Scoop](https://scoop.sh/) package manager
 
@@ -120,65 +119,6 @@ SPX stores its configuration in the Scoop directory:
 | Global Config | `$env:SCOOP_GLOBAL\spx\` or `~/scoop/apps/spx/` |
 | Links Registry | `$env:SCOOP\spx\links.json` |
 | Backups | `$env:SCOOP\spx\backups\` |
-
-## Migration from Legacy (scpl)
-
-SPX is the successor to the legacy scpl tool. The command mapping is:
-
-| Old (scpl) | New (spx) |
-|------------|-----------|
-| `scpl move <app> -R <path>` | `spx link <app> --path <path>` |
-| `scpl back <app>` | `spx unlink <app>` |
-| `scpl list` | `spx linked` |
-| `scpl sync <app>` | `spx sync <app>` |
-
-## Architecture
-
-```
-spx/
-├── spx.ps1              # CLI entry point
-├── context.ps1          # Scoop context resolution
-├── lib/
-│   ├── Core.ps1         # Shared utilities
-│   ├── Parse.ps1        # Argument parsing
-│   └── Config.ps1       # Configuration management
-├── modules/
-│   ├── Link/            # Custom path management
-│   ├── Source/          # Installed app source management
-│   └── Backup/          # Configuration backup/restore
-└── exec/
-    ├── Link.ps1         # Link command executor
-    ├── Unlink.ps1       # Unlink command executor
-    ├── Linked.ps1       # Linked command executor
-    ├── Sync.ps1         # Sync command executor
-    ├── Source.ps1       # Source command executor
-    └── Backup.ps1       # Backup command executor
-```
-
-## Development
-
-### Design Philosophy
-
-1. **Orthogonality**: SPX features complement Scoop without duplicating functionality
-2. **Modularity**: Each feature is an independent module with clear boundaries
-3. **Safety First**: Destructive operations require confirmation; all operations are reversible where possible
-4. **Transparency**: Clear logging and status reporting for all operations
-5. **Stateless by Default**: Modules should not record state unless absolutely necessary
-
-### Function Naming Convention
-
-SPX follows canonical Microsoft PowerShell naming conventions (Verb-Noun):
-
-| Verb | Purpose | Example |
-|------|---------|---------|
-| `Get-` | Retrieve data | `Get-AppLink` |
-| `Set-` | Modify configuration | `Set-Config` |
-| `New-` | Create new resource | `New-AppLink` |
-| `Remove-` | Delete resource | `Remove-AppLink` |
-| `Test-` | Validate/Check | `Test-AppLinked` |
-| `Invoke-` | Execute operation | `Invoke-AppSync` |
-| `Export-` | Export data | `Export-Backup` |
-| `Import-` | Import data | `Import-Backup` |
 
 ## License
 

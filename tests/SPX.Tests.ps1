@@ -219,7 +219,7 @@ Describe "Remove-AppLinkEntry" {
 
 Describe "Get-PersistDefinition" {
     BeforeAll {
-        . "$PSScriptRoot/../modules/Link/Move.ps1"
+        . "$PSScriptRoot/../lib/Link.ps1"
     }
     
     It "Should parse string persist definition" {

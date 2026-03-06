@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\..\context.ps1"
 . "$PSScriptRoot\..\lib\Parse.ps1"
 . "$PSScriptRoot\..\lib\Core.ps1"
-. "$PSScriptRoot\..\modules\Source\Source.ps1"
+. "$PSScriptRoot\..\modules\Source.ps1"
 
 # Help content for source module
 $sourceHelp = @'
