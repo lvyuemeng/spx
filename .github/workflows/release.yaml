@@ -75,4 +75,18 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add spx.json
           git commit -m "Update spx.json to ${{ env.RELEASE_TAG }}"
-          git push origin HEAD:main
+          git push origin HEAD:refs/heads/release-${{ env.RELEASE_TAG }} -f
+        shell: pwsh
+
+      - name: Create Pull Request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Update spx.json to ${{ env.RELEASE_TAG }}',
+              body: 'Update spx.json to ${{ env.RELEASE_TAG }} for Scoop release',
+              head: 'release-${{ env.RELEASE_TAG }}',
+              base: 'main'
+            })
