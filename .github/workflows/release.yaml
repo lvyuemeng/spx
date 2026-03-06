@@ -62,8 +62,8 @@ jobs:
         run: |
           $version = "${{ env.RELEASE_TAG }}"
           
-          # Update scoop manifest version using jq
-          jq --arg version "$version" '.version = $version' spx.json | Set-Content -Path spx.json -Encoding UTF8
+          # Update scoop manifest version and URL using jq
+          jq --arg version "$version" '.version = $version | .url = "https://github.com/lvyuemeng/spx/archive/refs/tags/" + $version + ".zip"' spx.json | Set-Content -Path spx.json -Encoding UTF8
           
           Write-Host "Updated scoop manifest:"
           Get-Content -Path "spx.json"
