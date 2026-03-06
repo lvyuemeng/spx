@@ -5,127 +5,49 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   release:
-    runs-on: windows-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-      pull-requests: write
-    env:
-      RELEASE_TAG: ${{ github.ref_name }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: refs/tags/${{ env.RELEASE_TAG }}
-          fetch-tags: true
 
-      - name: Get previous tag
-        id: prevtag
+      - name: Get version from tag
+        id: get_version
         run: |
-          $tags = git tag --sort=-v:refname
-          $current = "${{ env.RELEASE_TAG }}"
-          $previous = ($tags -split "`n" | Where-Object { $_ -ne $current -and $_ -ne "" } | Select-Object -First 1)
-          if (-not $previous) { $previous = $current }
-          echo "PREVIOUS_TAG=$previous" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8
-        shell: pwsh
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          $current = "${{ env.RELEASE_TAG }}"
-          $previous = "${{ steps.prevtag.outputs.PREVIOUS_TAG }}"
-          
-          $log = git log --no-merges --pretty=format:"- %s (%h)" "$previous..$current"
-          if (-not $log) {
-            $log = git log --no-merges --pretty=format:"- %s (%h)" -n 10
-          }
-          
-          $changelog = "## What's Changed`n`n$log`n`n---`n`n**Full Changelog**: https://github.com/${{ github.repository }}/compare/$previous...$current"
-          
-          # Write to GITHUB_OUTPUT using heredoc format
-          @"
-          CHANGELOG<<EOF
-          $changelog
-          EOF
-          "@ | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8
-        shell: pwsh
-
-      - name: Prepare Release Assets
-        id: prepare
-        run: |
-          $version = "${{ env.RELEASE_TAG }}"
-          $zipName = "spx-$version.zip"
-          
-          Write-Host "Creating zip archive: $zipName"
-          
-          # Get list of files to exclude
-          $excludePatterns = @(
-            ".git",
-            ".gitignore",
-            ".github",
-            "*.Tests.ps1",
-            "tests",
-            "docs",
-            "LICENSE-*",
-            "*.md"
-          )
-          
-          # Get all files except excluded ones
-          $files = Get-ChildItem -Recurse -File | Where-Object {
-            $relativePath = $_.FullName.Replace((Get-Location).Path + "\", "")
-            $shouldExclude = $false
-            foreach ($pattern in $excludePatterns) {
-              if ($relativePath -like $pattern -or $relativePath.StartsWith($pattern)) {
-                $shouldExclude = $true
-                break
-              }
-            }
-            -not $shouldExclude
-          }
-          
-          if ($files.Count -eq 0) {
-            Write-Host "Warning: No files to archive"
-            Compress-Archive -Path "./*" -DestinationPath $zipName -CompressionLevel Optimal -Force
-          } else {
-            Compress-Archive -Path $files.FullName -DestinationPath $zipName -CompressionLevel Optimal -Force
-          }
-          
-          Write-Host "Verifying zip archive:"
-          Get-Item $zipName
-          
-          # Calculate hash for scoop manifest
-          $hash = (Get-FileHash -Path $zipName -Algorithm SHA256).Hash.ToLower()
-          Write-Host "SHA256 Hash: $hash"
-          
-          # Update scoop manifest with version
-          $manifest = Get-Content -Path "spx.json" -Raw
-          $manifest = $manifest -replace 'VERSION_PLACEHOLDER', $version
-          $manifest | Set-Content -Path "spx.json" -Encoding UTF8
-          
-          Write-Host "Updated scoop manifest:"
-          Get-Content -Path "spx.json"
-          
-          # Set outputs
-          "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8
-          "SHA256_HASH=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding UTF8 -Append
-        shell: pwsh
-
-      - name: Upload Release Assets
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body: "${{ steps.changelog.outputs.CHANGELOG }}\n\n---\n\n## Installation\n\n### Via Scoop (Recommended)\n```powershell\nscoop install https://raw.githubusercontent.com/${{ github.repository }}/${{ env.RELEASE_TAG }}/spx.json\n```\n\n### Manual Download\n- [spx-${{ env.RELEASE_TAG }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/spx-${{ env.RELEASE_TAG }}.zip)\n\n## SHA256 Checksum\n```\n${{ steps.prepare.outputs.SHA256_HASH }}\n```"
-          files: |
-            spx-${{ env.RELEASE_TAG }}.zip
-            spx.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          name: SPX ${{ steps.get_version.outputs.VERSION }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-rc') || contains(steps.get_version.outputs.VERSION, '-beta') || contains(steps.get_version.outputs.VERSION, '-alpha') }}
 
-      # Note: Commit step skipped - repository requires PRs for direct pushes
-      # The spx.json is uploaded as a release asset for manual PR creation
+      - name: Update Scoop manifest
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          jq --arg version "$VERSION" --arg url "https://github.com/lvyuemeng/spx/archive/refs/tags/$VERSION.zip?download=spx.zip" '.version = $version | .url = $url' spx.json > spx.json.tmp && mv spx.json.tmp spx.json
+
+      - name: Commit updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add spx.json
+          git commit -m "chore: update scoop manifest for ${{ steps.get_version.outputs.VERSION }}" || echo "No changes to commit"
+          
+      - name: Push changes
+        run: |
+          git push origin HEAD:refs/heads/main

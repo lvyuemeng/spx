@@ -3,12 +3,12 @@
     "description": "SPX (Scoop Power Extensions) - A PowerShell-based enhancement toolkit for Scoop that provides orthogonal functionalities not covered by Scoop's core features.",
     "homepage": "https://github.com/lvyuemeng/spx",
     "license": "Apache-2.0|MIT",
-    "url": "https://github.com/lvyuemeng/spx/releases/download/vVERSION_PLACEHOLDER/spx-vVERSION_PLACEHOLDER.zip",
+    "url": "https://github.com/lvyuemeng/spx/archive/refs/tags/VERSION_PLACEHOLDER.zip?download=spx.zip",
     "bin": "spx.ps1",
     "checkver": {
         "github": "https://github.com/lvyuemeng/spx"
     },
     "autoupdate": {
-        "url": "https://github.com/lvyuemeng/spx/releases/download/v$version/spx-v$version.zip"
+        "url": "https://github.com/lvyuemeng/spx/archive/refs/tags/$version.zip?download=spx.zip"
     }
 }
